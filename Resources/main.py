@@ -1,12 +1,16 @@
 import random
+import time
 import printhanza
 import Downloadimage
+import os
+
 hanzalen, dontneed =printhanza.fileopen()
 hanzalist = [0]*hanzalen
 breaking = 0
 breaking2 = 0
 download = 0
 printimg = 0
+
 def game():
     global breaking
     global breaking2
@@ -36,7 +40,7 @@ def game():
         Hanzaimg = Hanza[0]
         print(Hanzaimg)
         A = input()
-        if A == "저장" or A=="save" or A=="한자":
+        if A == "등록" or A=="save" or A=="한자":
             download = 1
             break
         if A=="사전":
@@ -75,6 +79,28 @@ def game():
 
 
 def main():
+    try:
+        a= os.getcwd()
+        a+="\\Hanzastudy"
+        f= open(f"{a}/Hanza.txt",'r',-1,"utf-8")
+        f.close()
+    except:
+        a= os.getcwd()
+        a+="\\Hanzastudy"
+        f= open(f"{a}/Hanza.txt",'w',-1,"utf-8")
+        print("첫 설정을 하는 중입니다....",end='',flush=True)
+        for i in range(1,9):
+            time.sleep(1)
+            print('\r',end='',flush=True)
+            print('  '*20, end='', flush=True)
+            print('\r', end='', flush=True)
+            print('첫 설정을 하는 중입니다'+'.'*(i%4),end='',flush=True)
+        print('\r',end='',flush=True)
+        print(' ' *20, end='', flush=True)
+        print('\r', end='', flush=True)
+        print("설정이 완료 되었습니다!\n")
+        f.close()
+                
     global breaking
     global breaking2
     global download
@@ -84,11 +110,13 @@ def main():
         breaking2 = 0
         download = 0
         printimg = 0
-        A = input("무엇을 하시겠습니까?\n게임 , 저장 , 사전 , 종료\n")
+        A = input("무엇을 하시겠습니까?  (도움말 : help)\n게임 , 등록 , 사전 , 종료\n\n")
+        if A =="H"or A=='h'or A=='help':
+            print("\n게임 : 한자 맞추기 게임\n등록 : 학습한 한자 등록\n사전 : 학습한 한자 보기\n종료 : 프로그램을 종료합니다\n")
         if A =='게임':
             print('')
             game()
-        elif A =='저장':
+        elif A =='등록':
             print('')
             Downloadimage.hanzasave()
         elif A=='사전':
@@ -96,6 +124,7 @@ def main():
             printhanza.findhanza()
         elif A=='종료':
             print("종료합니다")
+            break
 
 
 if __name__ == "__main__":

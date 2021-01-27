@@ -81,6 +81,7 @@ def hanzasave1(hanza,group=1):
                     a= input("저장할까요?\nY/N : ")
                     does_save(hanzaimg,hanzamean,a)
         else:
+            hanzaimg, hanzamean = searchhanza(hanza)
             print(hanzaimg,':',hanzamean)
             a= os.getcwd()
             f= open(f"{a}\\Hanza.txt",'r',-1,"utf-8")

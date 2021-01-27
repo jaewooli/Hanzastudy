@@ -2,20 +2,22 @@ import random
 import time
 import printhanza
 import Downloadimage
+import Deletehanza
 import os
 
-hanzalen, dontneed =printhanza.fileopen()
-hanzalist = [0]*hanzalen
-breaking = 0
-breaking2 = 0
-download = 0
-printimg = 0
+
+is_breaking = 0
+is_breaking2 = 0
+is_download = 0
+is_printimg = 0
 
 def game():
-    global breaking
-    global breaking2
-    global download
-    global printimg
+    hanzalen, dontneed =printhanza.fileopen()
+    hanzalist = [0]*hanzalen
+    global is_breaking
+    global is_breaking2
+    global is_download
+    global is_printimg
     while 1:
         length, listf = printhanza.fileopen()
         while 1:
@@ -27,13 +29,13 @@ def game():
                     hanzalist[r]=1 
                     break
             elif 0 not in hanzalist:
-                if breaking ==1 :
+                if is_breaking ==1 :
                     break
-                elif breaking ==0:
+                elif is_breaking ==0:
                     print("학습한 모든 한자를 복습했습니다!")
-                    breaking = 1
+                    is_breaking = 1
                     break
-        if breaking:
+        if is_breaking:
             break
         Hanza = listf[r]
         Hanzamean = Hanza[3:]
@@ -41,17 +43,16 @@ def game():
         print(Hanzaimg)
         A = input()
         if A == "등록" or A=="save" or A=="한자":
-            download = 1
+            is_download = 1
             break
         if A=="사전":
-            printimg = 1
+            is_printimg = 1
             break
-        elif A=='ㅠ' or A=='b' or A=='B' or A=='break':
-            breaking2 = 1
+        elif A=="종료"or A=="break":
+            is_breaking2 = 1
             break
         elif A in Hanzamean:
             print("정답입니다!\n")
-            game()
         elif A not in Hanzamean:
             print("오답입니다\n해당 한자의 뜻입니다. 정답이라고 하시겠습니까? Y/N")
             print(Hanzamean)
@@ -68,29 +69,26 @@ def game():
                 else:
                     print("Y 혹은 N을 입력해주세요")
             print('')
-            game()
         
-    if download:
-        Downloadimage.hanzasave()
-    elif printimg:
-        printhanza.findhanza()
-    elif breaking2:
+    if is_download:
+        Downloadimage.main()
+    elif is_printimg:
+        printhanza.main()
+    elif is_breaking2:
         pass
 
 
 def main():
     try:
         a= os.getcwd()
-        a+="\\Hanzastudy"
-        f= open(f"{a}/Hanza.txt",'r',-1,"utf-8")
+        f= open(f"{a}\\Hanza.txt",'r',-1,"utf-8")
         f.close()
     except:
         a= os.getcwd()
-        a+="\\Hanzastudy"
-        f= open(f"{a}/Hanza.txt",'w',-1,"utf-8")
+        f= open(f"{a}\\Hanza.txt",'x',-1,"utf-8")
         print("첫 설정을 하는 중입니다....",end='',flush=True)
         for i in range(1,9):
-            time.sleep(1)
+            time.sleep(0.5)
             print('\r',end='',flush=True)
             print('  '*20, end='', flush=True)
             print('\r', end='', flush=True)
@@ -101,28 +99,32 @@ def main():
         print("설정이 완료 되었습니다!\n")
         f.close()
                 
-    global breaking
-    global breaking2
-    global download
-    global printimg
+    global is_breaking
+    global is_breaking2
+    global is_download
+    global is_printimg
+
     while 1:
-        breaking = 0
-        breaking2 = 0
-        download = 0
-        printimg = 0
-        A = input("무엇을 하시겠습니까?  (도움말 : help)\n게임 , 등록 , 사전 , 종료\n\n")
+        is_breaking = 0
+        is_breaking2 = 0
+        is_download = 0
+        is_printimg = 0
+        A = input("무엇을 하시겠습니까?  (도움말 : help)\n게임 , 등록 , 사전 , 삭제 ,종료\n\n")
         if A =="H"or A=='h'or A=='help':
-            print("\n게임 : 한자 맞추기 게임\n등록 : 학습한 한자 등록\n사전 : 학습한 한자 보기\n종료 : 프로그램을 종료합니다\n")
+            print("\n게임 : 한자 맞추기 게임\n등록 : 학습한 한자 등록\n사전 : 학습한 한자 보기\n삭제 : 한자를 사전에서 삭제\n종료 : 프로그램을 종료합니다\n")
         if A =='게임':
             print('')
             game()
         elif A =='등록':
             print('')
-            Downloadimage.hanzasave()
+            Downloadimage.main()
         elif A=='사전':
             print('')
-            printhanza.findhanza()
-        elif A=='종료':
+            printhanza.main()
+        elif A=="삭제":
+            print('')
+            Deletehanza.main()
+        elif A=='종료'or A=='^C':
             print("종료합니다")
             break
 

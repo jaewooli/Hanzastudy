@@ -1,10 +1,9 @@
 import os
 
-def findhanza():
+def main():
     while 1:
         a= os.getcwd()
-        a+="\\Hanzastudy"
-        f= open(f"{a}/Hanza.txt",'r',-1,"utf-8")
+        f= open(f"{a}\\Hanza.txt",'r',-1,"utf-8")
         cnt =0
         A = input("찾는 한자, 또는 그 뜻을 입력하세요 :\n")
         if A =="H"or A=='h'or A=='help':
@@ -14,7 +13,7 @@ def findhanza():
             listf = B.split("\n")[:-1]
             print(B)
             f.close()
-        elif A=="break" or A=="B":
+        elif A=="break" or A=="종료":
             f.close()
             break
         else:
@@ -35,9 +34,8 @@ def findhanza():
 def fileopen():
     try:
         a= os.getcwd()
-        a+="\\Hanzastudy"
-        f= open(f"{a}/Hanza.txt",'r',-1,"utf-8")
+        f= open(f"{a}\\Hanza.txt",'r',-1,"utf-8")
         listf = f.read().split("\n")
         return len(listf)-1, listf
     except: 
-        return 0,0
+        return "",""

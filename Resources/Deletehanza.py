@@ -8,6 +8,12 @@ def main():
             print("사전에서 삭제할 한자를 입력해주세요!\n종료 : 한자 삭제를 종료합니다")
         elif content == "종료":
             break
+        elif content == "all":
+            a= os.getcwd()
+            f= open(f"{a}\\Hanza.txt","w",-1,"utf-8")
+            f.write("")
+            f.close()
+            break
         else:
             deletehanza(content)
 
@@ -24,8 +30,6 @@ def deletehanza(content):
             print(hanzaimg,':',hanzamean,"\n")
             reading[line] = ""
             is_readed = 1
-            """if line > 0:
-                reading[line-1] = reading[line-1][:-1]"""
             break
     f=open(f"{a}\\Hanza.txt",'w',-1,"utf-8")
     for i in reading:

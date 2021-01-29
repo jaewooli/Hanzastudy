@@ -1,13 +1,15 @@
 import os
+from colorama import Fore, Style
 
 def main():
+    stylex = Style.RESET_ALL
     while 1:
         a= os.getcwd()
         f= open(f"{a}\\Hanza.txt",'r',-1,"utf-8")
         cnt =0
-        A = input("찾는 한자, 또는 그 뜻을 입력하세요 :\n")
+        A = input(f"{Fore.GREEN}찾는 한자, 또는 그 뜻을 입력하세요 : {stylex}\n")
         if A =="H"or A=='h'or A=='help':
-            print("리스트 : 전체 단어 리스트\n예시:) 집 가\n")
+            print(f"{Fore.GREEN}리스트{stylex} : 전체 단어 리스트\n{Fore.GREEN}예시:) 집 가{stylex}\n")
         elif A=="리스트" or A=="list":
             B=f.read()
             listf = B.split("\n")[:-1]
@@ -28,7 +30,7 @@ def main():
                     print('')
                     break
                 if cnt ==len(listf):
-                    print("해당 한자가 사전에 등록되어있지 않습니다. 사전에 등록해주세요.\n")
+                    print(f"{Fore.RED}해당 한자가 사전에 등록되어있지 않습니다. 사전에 등록해주세요.{stylex}\n")
             f.close()
             
 def fileopen():

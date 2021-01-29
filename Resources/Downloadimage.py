@@ -1,26 +1,29 @@
 from bs4 import BeautifulSoup
 import requests
 import os
+from colorama import Fore, Style
 
 def does_save(hanzaimg,hanzamean,a):
+    stylex = Style.RESET_ALL
     if a =="Y" or a=='y' or a=='ㅛ':
         a= os.getcwd()
         f= open(f"{a}\\Hanza.txt",'a',-1,"utf-8")
         f.write(f"{hanzaimg}: {hanzamean}\n")
         f.close()
-        print('해당 한자를 저장합니다.\n')
+        print(f'{Fore.GREEN}해당 한자를 저장합니다.{stylex}\n')
     elif a=="N" or a=='n' or a== 'ㅜ':
         pass
     else:
-        a= input("Y 혹은 N 을 입력해주세요.\nY/N : ")
+        a= input(f"{Fore.RED}Y 혹은 N 을 입력해주세요.{stylex}\n{Fore.GREEN}Y{stylex}/{Fore.GREEN}N{stylex} : ")
         does_save(hanzaimg,hanzamean,a)
 
 def main():
+    stylex = Style.RESET_ALL
     while 1:
         geaupsu = [8,7,6,5,4,3,2,1,0]
-        hanza = u"{hanza}" .format(hanza = input("등록할 한자:"))
+        hanza = u"{hanza}" .format(hanza = input(f"{Fore.GREEN}등록할 한자: {stylex}\n"))
         if hanza =='h' or hanza =="help" or hanza == "도움말":
-            print("등록할 한자의 뜻을 입력해주세요!\n나가기: 종료")
+            print(f"{Fore.GREEN}등록할 한자의 뜻을 입력해주세요!{stylex}\n{Fore.RED}나가기: 종료{stylex}")
         if hanza == '종료':
             break
         if hanza[-1]=='급' and len(hanza) ==2:
@@ -30,6 +33,7 @@ def main():
             hanzasave1(hanza)
 
 def searchhanza(hanza):
+    stylex = Style.RESET_ALL
     try:
         page = requests.get(f"https://hanja.dict.naver.com/search?query={hanza}")
         soup = BeautifulSoup(page.content, 'html.parser')
@@ -54,14 +58,15 @@ def searchhanza(hanza):
         return hanzaimg, hanzamean
         
     except AttributeError:
-            print('입력하신 한자를 찾을 수 없습니다.',end='')
+            print(f'{Fore.RED}입력하신 한자를 찾을 수 없습니다.{stylex}',end='')
             return ";", ";"
 
 def hanzasave1(hanza,group=1):
+    stylex = Style.RESET_ALL
     a= os.getcwd()
     f= open(f"{a}\\Hanza.txt",'r',-1,"utf-8")
     if f'{hanza}' in f.read():
-        print('해당 한자가 이미 저장되어 있습니다')
+        print(f'{Fore.RED}해당 한자가 이미 저장되어 있습니다{stylex}')
         f.close()
     else:
         if group:
@@ -70,15 +75,15 @@ def hanzasave1(hanza,group=1):
                 print('\n')
             else:
                 if hanza not in hanzamean:
-                    print("검색된 한자가 입력한 한자와 뜻이 다릅니다.\n찾는 한자인가요?")
+                    print(f"{Fore.RED}검색된 한자가 입력한 한자와 뜻이 다릅니다.{stylex}\n{Fore.GREEN}찾는 한자인가요?{stylex}")
                     print(hanzaimg)
                     print(",".join(hanzamean))
-                    a =input("Y/N : ")
+                    a =input(f"{Fore.GREEN}Y{stylex}/{Fore.RED}N{stylex} : ")
                     does_save(hanzaimg,hanzamean,a)
                 else:
                     print(hanzaimg)
                     print(hanzamean)
-                    a= input("저장할까요?\nY/N : ")
+                    a= input(f"{Fore.GREEN}저장할까요?\n\nY{stylex}/{Fore.RED}N{stylex} : ")
                     does_save(hanzaimg,hanzamean,a)
         else:
             hanzaimg, hanzamean = searchhanza(hanza)
@@ -86,7 +91,7 @@ def hanzasave1(hanza,group=1):
             a= os.getcwd()
             f= open(f"{a}\\Hanza.txt",'r',-1,"utf-8")
             if f'{hanza}' in f.read():
-                print('해당 한자가 이미 저장되어 있습니다')
+                print(f'{Fore.RED}해당 한자가 이미 저장되어 있습니다{stylex}')
                 f.close()
             else:
                 f.close()

@@ -3,8 +3,11 @@ import time
 import printhanza
 import Downloadimage
 import Deletehanza
-import os
+import os, sys
+from colorama import Fore, Style, init
 
+init()
+stylex = Style.RESET_ALL
 
 is_breaking = 0
 is_breaking2 = 0
@@ -32,7 +35,7 @@ def game():
                 if is_breaking ==1 :
                     break
                 elif is_breaking ==0:
-                    print("학습한 모든 한자를 복습했습니다!")
+                    print(f"{Fore.GREEN}학습한 모든 한자를 복습했습니다!{stylex}")
                     is_breaking = 1
                     break
         if is_breaking:
@@ -52,9 +55,9 @@ def game():
             is_breaking2 = 1
             break
         elif A in Hanzamean:
-            print("정답입니다!\n")
+            print(f"{Fore.GREEN}정답입니다!\n{stylex}")
         elif A not in Hanzamean:
-            print("오답입니다\n해당 한자의 뜻입니다. 정답이라고 하시겠습니까? Y/N")
+            print(f"{Fore.RED}오답입니다{stylex}\n해당 한자의 뜻입니다. 정답이라고 하시겠습니까? {Fore.GREEN}Y{stylex}/{Fore.RED}N{stylex}")
             print(Hanzamean)
             while 1:
                 A= input()
@@ -67,7 +70,7 @@ def game():
                     print('')
                     break
                 else:
-                    print("Y 혹은 N을 입력해주세요")
+                    print(f"{Fore.RED}Y 혹은 N을 입력해주세요{stylex}")
             print('')
         
     if is_download:
@@ -86,17 +89,17 @@ def main():
     except:
         a= os.getcwd()
         f= open(f"{a}\\Hanza.txt",'x',-1,"utf-8")
-        print("첫 설정을 하는 중입니다....",end='',flush=True)
+        print(f"{Fore.GREEN}첫 설정을 하는 중입니다....{stylex}",end='',flush=True)
         for i in range(1,9):
             time.sleep(0.5)
             print('\r',end='',flush=True)
             print('  '*20, end='', flush=True)
             print('\r', end='', flush=True)
-            print('첫 설정을 하는 중입니다'+'.'*(i%4),end='',flush=True)
+            print(f'{Fore.GREEN}첫 설정을 하는 중입니다'+'.'*(i%4)+stylex,end='',flush=True)
         print('\r',end='',flush=True)
         print(' ' *20, end='', flush=True)
         print('\r', end='', flush=True)
-        print("설정이 완료 되었습니다!\n")
+        print(f"{Fore.GREEN}설정이 완료 되었습니다!\n{stylex}")
         f.close()
                 
     global is_breaking
@@ -109,9 +112,9 @@ def main():
         is_breaking2 = 0
         is_download = 0
         is_printimg = 0
-        A = input("무엇을 하시겠습니까?  (도움말 : help)\n게임 , 등록 , 사전 , 삭제 ,종료\n\n")
+        A = input(f"무엇을 하시겠습니까?  {Fore.GREEN}(도움말 : help){stylex}\n게임 , 등록 , 사전 , 삭제 ,종료\n\n")
         if A =="H"or A=='h'or A=='help':
-            print("\n게임 : 한자 맞추기 게임\n등록 : 학습한 한자 등록\n사전 : 학습한 한자 보기\n삭제 : 한자를 사전에서 삭제\n종료 : 프로그램을 종료합니다\n")
+            print(f"{Fore.GREEN}\n게임 : 한자 맞추기 게임\n등록 : 학습한 한자 등록\n사전 : 학습한 한자 보기\n삭제 : 한자를 사전에서 삭제\n종료 : 프로그램을 종료합니다\n{stylex}")
         if A =='게임':
             print('')
             game()

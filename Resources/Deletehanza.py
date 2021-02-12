@@ -19,6 +19,7 @@ def main():
         else:
             deletehanza(content)
 
+
 def deletehanza(content):
     stylex = Style.RESET_ALL
     a= os.getcwd()

@@ -1,43 +1,33 @@
-import os
 from colorama import Fore, Style
+
+import hanzadata
+
+
+def _grade_label(grade):
+    return f"{grade}급" if grade else "급수 미지정"
+
 
 def main():
     stylex = Style.RESET_ALL
     while 1:
-        a= os.getcwd()
-        f= open(f"{a}\\Hanza.txt",'r',-1,"utf-8")
-        cnt =0
         A = input(f"{Fore.GREEN}찾는 한자, 또는 그 뜻을 입력하세요 : {stylex}\n")
-        if A =="H"or A=='h'or A=='help':
+        if A == "H" or A == 'h' or A == 'help':
             print(f"{Fore.GREEN}리스트{stylex} : 전체 단어 리스트\n{Fore.GREEN}예시:) 집 가{stylex}\n")
-        elif A=="리스트" or A=="list":
-            B=f.read()
-            listf = B.split("\n")[:-1]
-            print(B)
-            f.close()
-        elif A=="break" or A=="종료":
-            f.close()
+        elif A == "리스트" or A == "list":
+            entries = hanzadata.load_all()
+            for hanja, means, grade in entries:
+                print(f"{hanja} : {', '.join(means)} ({_grade_label(grade)})")
+            print('')
+        elif A == "break" or A == "종료":
             break
         else:
-            listf = f.read().split("\n")
-            for line in listf:
-                cnt+=1
-                if A in line:
-                    linea = line.split(":")
-                    lineb = str(linea[1])
-                    linea = str(linea[0])
-                    print(linea,lineb)
+            entries = hanzadata.load_all()
+            found = False
+            for hanja, means, grade in entries:
+                if A in hanja or any(A in m for m in means):
+                    print(hanja, ':', ', '.join(means), f"({_grade_label(grade)})")
                     print('')
+                    found = True
                     break
-                if cnt ==len(listf):
-                    print(f"{Fore.RED}해당 한자가 사전에 등록되어있지 않습니다. 사전에 등록해주세요.{stylex}\n")
-            f.close()
-            
-def fileopen():
-    try:
-        a= os.getcwd()
-        f= open(f"{a}\\Hanza.txt",'r',-1,"utf-8")
-        listf = f.read().split("\n")
-        return len(listf)-1, listf
-    except: 
-        return "",""
+            if not found:
+                print(f"{Fore.RED}해당 한자가 사전에 등록되어있지 않습니다. 사전에 등록해주세요.{stylex}\n")

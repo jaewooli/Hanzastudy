@@ -1,0 +1,4 @@
+Resources/Hanza.txt
+Resources/__pycache__/
+__pycache__/
+*.pyc

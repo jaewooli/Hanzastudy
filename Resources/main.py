@@ -1,5 +1,6 @@
 import random
 import time
+import unicodedata
 
 import requests
 
@@ -7,6 +8,7 @@ import printhanza
 import Downloadimage
 import Deletehanza
 import hanzadata
+import hanjaart
 from colorama import Fore, Style, init
 
 init()
@@ -26,30 +28,41 @@ def ask_grade():
 
 
 def play(entries, empty_message):
-    hanzalen = len(entries)
-    hanzalist = [0] * hanzalen
-    is_breaking = False
+    remaining = list(range(len(entries)))
+    random.shuffle(remaining)
+    # 틀린 한자: [인덱스, 다시 나오기까지 남은 문제 수]
+    retry = []
+    fails = {}
+    # 새 한자가 남아 있으면 복습 문제 사이에 최소 이만큼 새 문제를 끼워 넣음
+    min_new_between = 2
+    since_retry = min_new_between
     is_download = False
     is_printimg = False
     while 1:
-        while 1:
-            if 0 in hanzalist:
-                r = random.randrange(0, hanzalen)
-                if hanzalist[r]:
-                    continue
-                hanzalist[r] = 1
-                break
-            else:
-                if is_breaking:
-                    break
-                print(f"{Fore.GREEN}{empty_message}{stylex}")
-                is_breaking = True
-                break
-        if is_breaking:
+        due = [item for item in retry if item[1] <= 0]
+        if due and (since_retry >= min_new_between or not remaining):
+            # 가장 오래 기다린 한자부터
+            item = min(due, key=lambda x: x[1])
+        elif remaining:
+            item = None
+        elif retry:
+            # 남은 문제가 없으면 가장 먼저 다시 나올 한자를 바로 출제
+            item = min(retry, key=lambda x: x[1])
+        else:
+            print(f"{Fore.GREEN}{empty_message}{stylex}")
             break
+        if item is not None:
+            retry.remove(item)
+            r = item[0]
+            since_retry = 0
+        else:
+            r = remaining.pop()
+            since_retry += 1
+        for pending in retry:
+            pending[1] -= 1
         hanja, means, grade = entries[r]
-        print(hanja)
-        A = input()
+        print(hanjaart.best(hanja))
+        A = unicodedata.normalize("NFC", input().strip())
         if A == "등록" or A == "save" or A == "한자":
             is_download = True
             break
@@ -66,11 +79,13 @@ def play(entries, empty_message):
             while 1:
                 A = input()
                 if A in ("Y", "y", "ㅛ"):
-                    hanzalist[r] = 1
                     print('')
                     break
                 elif A in ("N", "n", "ㅜ"):
-                    hanzalist[r] = 0
+                    # 여러 번 틀릴수록 다시 나오는 간격을 늘림
+                    fails[r] = fails.get(r, 0) + 1
+                    gap = min(random.randint(8, 12) * 2 ** (fails[r] - 1), 40)
+                    retry.append([r, gap])
                     print('')
                     break
                 else:
@@ -173,4 +188,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n{Fore.GREEN}프로그램을 종료합니다.{stylex}")

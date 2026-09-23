@@ -4,7 +4,7 @@ FIELD_SEP = "\t"
 
 
 def file_path():
-    return os.path.join(os.getcwd(), "Hanza.txt")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "Hanza.txt")
 
 
 def ensure_file():

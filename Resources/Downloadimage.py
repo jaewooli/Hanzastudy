@@ -156,17 +156,21 @@ def _section_tables(target_heading, section_headings):
 
 
 def _get_from_grade_list_page(grade):
-    """5~8급: 나무위키 '한자/목록/급수별' 문서의 해당 급수 소제목 아래 표에서 가져온다."""
+    """5~8급: 나무위키 '한자/목록/급수별' 문서의 해당 급수 및 준N급(N급Ⅱ) 소제목 아래 표에서 가져온다.
+    한국어문회 공식 배정한자는 N급Ⅱ 한자를 N급 시험 범위에 포함하므로 두 절을 합쳐서 반환한다."""
     soup = _fetch_soup(GRADE_LIST_URL)
     anchors = soup.find_all(id=re.compile(r"^s-2\.\d+$"))
     section_headings = [h for h in (a.find_parent(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']) for a in anchors) if h]
-    target_suffix = f"{grade}급[편집]"
-    junior_suffix = f"준{grade}급[편집]"
+    base_label = f"{grade}급[편집]"
+    junior_label = f"준{grade}급[편집]"
+    chars = []
     for heading in section_headings:
         text = heading.get_text(strip=True)
-        if text.endswith(target_suffix) and not text.endswith(junior_suffix):
-            return _chars_from_tables(_section_tables(heading, section_headings))
-    return []
+        match = re.search(r"([가-힣0-9]+급\[편집\])$", text)
+        label = match.group(1) if match else text
+        if label in (base_label, junior_label):
+            chars.extend(_chars_from_tables(_section_tables(heading, section_headings)))
+    return chars
 
 
 def _get_from_grade_document(grade):

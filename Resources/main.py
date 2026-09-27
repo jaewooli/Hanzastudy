@@ -2,6 +2,12 @@ import random
 import time
 import unicodedata
 
+try:
+    # 터미널 기본 줄 편집은 백스페이스로 한글(3바이트)을 1바이트만 지워 입력이 깨짐
+    import readline  # noqa: F401
+except ImportError:
+    pass
+
 import requests
 
 import printhanza

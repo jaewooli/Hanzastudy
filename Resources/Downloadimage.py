@@ -84,6 +84,41 @@ def _fetch_daum_entry(hanza):
     return hanzaimg, hanzamean
 
 
+def _clean_text(el):
+    return re.sub(r"\s+", " ", el.get_text()).strip()
+
+
+def fetch_hanza_info(hanza, max_words=3):
+    """부수와 그 한자가 들어간 한자어를 가져온다.
+    {"radical": "亻 (사람인변, 2획)", "words": [["優秀", "우수", "여럿 가운데 뛰어나고 빼어남"], ...]}"""
+    page = requests.get("https://dic.daum.net/search.do", params={"q": hanza, "dic": "hanja"}, timeout=15)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    radical = ""
+    head = soup.find("div", class_="kuhh_type")
+    if head is not None:
+        for em in head.find_all("em", class_="emph_hanja"):
+            label = em.find("span", class_="txt_emph3")
+            if label is not None and label.get_text(strip=True) == "부수":
+                label.extract()
+                radical = _clean_text(em)
+    words = []
+    for div in soup.find_all("div", class_="kokk_type"):
+        word_link = div.find("a", class_="txt_searchword")
+        reading = div.find("a", class_="sub_txt")
+        if word_link is None or reading is None:
+            continue
+        for sup in word_link.find_all("sup"):
+            sup.extract()
+        word = word_link.get_text(strip=True).replace(" ", "")
+        if hanza not in word or len(word) < 2:
+            continue
+        mean = div.find("span", class_="txt_search")
+        words.append([word, reading.get_text(strip=True), _clean_text(mean) if mean else ""])
+        if len(words) >= max_words:
+            break
+    return {"radical": radical, "words": words}
+
+
 def searchhanza(hanza, attempts=3):
     stylex = Style.RESET_ALL
     for attempt in range(attempts):

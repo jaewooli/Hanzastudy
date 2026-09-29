@@ -1,4 +1,5 @@
 import random
+import re
 import time
 import unicodedata
 
@@ -43,6 +44,9 @@ REVIEW_RATE = 0.2
 
 DONT_KNOW = ("", "?", "모름")
 
+# 예시 한자어 뜻이 길면 이 글자 수에서 자름
+WORD_MEAN_LIMIT = 40
+
 
 class Stats:
     def __init__(self):
@@ -79,6 +83,38 @@ def display_means(means):
     return ", ".join([m for m in means if " " in m] or means)
 
 
+_info_cache = None
+
+
+def get_info(hanja):
+    """부수·예시 한자어. 처음 볼 때만 사전에서 가져와 HanzaInfo.json에 저장해 둔다."""
+    global _info_cache
+    if _info_cache is None:
+        _info_cache = hanzadata.load_info()
+    if hanja not in _info_cache:
+        try:
+            _info_cache[hanja] = Downloadimage.fetch_hanza_info(hanja)
+        except requests.exceptions.RequestException:
+            return None
+        hanzadata.save_info(_info_cache)
+    return _info_cache[hanja]
+
+
+def show_hanja(hanja, means):
+    """훈음과 함께 부수, 그 한자가 들어간 한자어를 보여준다."""
+    print(f"{Fore.YELLOW}{hanja} : {display_means(means)}{stylex}")
+    info = get_info(hanja)
+    if not info:
+        return
+    if info["radical"]:
+        print(f"부수 : {info['radical']}")
+    for word, reading, mean in info["words"]:
+        mean = re.sub(r"^\d+\.\s*", "", mean)
+        if len(mean) > WORD_MEAN_LIMIT:
+            mean = mean[:WORD_MEAN_LIMIT] + "…"
+        print(f"  {Fore.CYAN}{word}({reading}){stylex} {mean}")
+
+
 def ask(entries, r, stats):
     """한 문제를 낸다. 맞으면 True, 틀리면 False, 메뉴 명령이면 '등록'/'사전'/'종료'."""
     hanja, means, _ = entries[r]
@@ -99,7 +135,8 @@ def ask(entries, r, stats):
         print(f"{Fore.GREEN}정답입니다!\n{stylex}")
         return True
     if A in DONT_KNOW:
-        print(f"{Fore.YELLOW}{hanja} : {display_means(means)}{stylex}\n")
+        show_hanja(hanja, means)
+        print('')
         return False
     print(f"{Fore.RED}오답입니다{stylex}\n해당 한자의 뜻입니다. 정답이라고 하시겠습니까? {Fore.GREEN}Y{stylex}/{Fore.RED}N{stylex}")
     print(", ".join(means))
@@ -109,7 +146,9 @@ def ask(entries, r, stats):
             print('\n')
             return True
         elif A in ("N", "n", "ㅜ"):
-            print('\n')
+            print('')
+            show_hanja(hanja, means)
+            print('')
             return False
         else:
             print(f"{Fore.RED}Y 혹은 N을 입력해주세요{stylex}")
@@ -179,7 +218,7 @@ def introduce(entries, chunk):
     for i, r in enumerate(chunk, 1):
         hanja, means, _ = entries[r]
         print(hanjaart.best(hanja))
-        print(f"{Fore.YELLOW}{hanja} : {display_means(means)}{stylex}")
+        show_hanja(hanja, means)
         A = input(f"({i}/{len(chunk)}) 엔터 : 다음 , 종료 : 그만하기\n").strip()
         if A in ("종료", "break"):
             return False

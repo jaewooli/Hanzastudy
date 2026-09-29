@@ -1,3 +1,4 @@
+import json
 import os
 
 FIELD_SEP = "\t"
@@ -122,3 +123,24 @@ def save_learned(grade, chars):
     with open(learned_path(), "w", encoding="utf-8") as f:
         for g in sorted(learned):
             f.write(f"{g}{FIELD_SEP}{''.join(sorted(learned[g]))}\n")
+
+
+def info_path():
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "HanzaInfo.json")
+
+
+def load_info():
+    """한자별 부수·예시 한자어 캐시: {한자: {"radical": ..., "words": [[한자어, 읽기, 뜻], ...]}}"""
+    path = info_path()
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_info(info):
+    with open(info_path(), "w", encoding="utf-8") as f:
+        json.dump(info, f, ensure_ascii=False, indent=1)

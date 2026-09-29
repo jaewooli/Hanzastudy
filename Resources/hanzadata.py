@@ -144,3 +144,24 @@ def load_info():
 def save_info(info):
     with open(info_path(), "w", encoding="utf-8") as f:
         json.dump(info, f, ensure_ascii=False, indent=1)
+
+
+def record_path():
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "Record.json")
+
+
+def load_records():
+    """한자별 풀이 기록: {한자: {"right": 맞힌 수, "wrong": 틀린 수, "streak": 연속 정답, "last": 마지막 풀이 시각}}"""
+    path = record_path()
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_records(records):
+    with open(record_path(), "w", encoding="utf-8") as f:
+        json.dump(records, f, ensure_ascii=False, indent=1)

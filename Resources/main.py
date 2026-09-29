@@ -23,7 +23,7 @@ stylex = Style.RESET_ALL
 
 VALID_GRADES = list(range(1, 9))
 
-MENU = ["게임", "급수학습", "급수복습", "등록", "사전", "삭제", "종료"]
+MENU = ["게임", "급수학습", "급수복습", "오답복습", "등록", "사전", "삭제", "종료"]
 
 
 def ask_grade():
@@ -46,6 +46,9 @@ DONT_KNOW = ("", "?", "모름")
 
 # 예시 한자어 뜻이 길면 이 글자 수에서 자름
 WORD_MEAN_LIMIT = 40
+
+# 틀린 적 있는 한자는 이만큼 연속으로 맞혀야 오답복습에서 빠짐
+WEAK_STREAK = 3
 
 
 class Stats:
@@ -115,8 +118,54 @@ def show_hanja(hanja, means):
         print(f"  {Fore.CYAN}{word}({reading}){stylex} {mean}")
 
 
+_records = None
+
+
+def records():
+    global _records
+    if _records is None:
+        _records = hanzadata.load_records()
+    return _records
+
+
+def record_answer(hanja, ok):
+    rec = records().setdefault(hanja, {"right": 0, "wrong": 0, "streak": 0})
+    if ok:
+        rec["right"] += 1
+        rec["streak"] += 1
+    else:
+        rec["wrong"] += 1
+        rec["streak"] = 0
+    rec["last"] = int(time.time())
+    hanzadata.save_records(records())
+
+
+def is_weak(hanja):
+    rec = records().get(hanja)
+    return bool(rec) and rec["wrong"] > 0 and rec["streak"] < WEAK_STREAK
+
+
+def priority(hanja):
+    """낮을수록 먼저 출제: 최근에 틀림 < 틀린 적 있음 < 처음 봄 < 잘 앎"""
+    rec = records().get(hanja)
+    if rec is None:
+        return 2
+    if rec["streak"] == 0:
+        return 0
+    if is_weak(hanja):
+        return 1
+    return 3
+
+
 def ask(entries, r, stats):
     """한 문제를 낸다. 맞으면 True, 틀리면 False, 메뉴 명령이면 '등록'/'사전'/'종료'."""
+    result = _ask(entries, r, stats)
+    if isinstance(result, bool):
+        record_answer(entries[r][0], result)
+    return result
+
+
+def _ask(entries, r, stats):
     hanja, means, _ = entries[r]
     print(hanjaart.best(hanja))
     A = unicodedata.normalize("NFC", input().strip())
@@ -164,6 +213,11 @@ def run_command(command):
 def play(entries, empty_message):
     remaining = list(range(len(entries)))
     random.shuffle(remaining)
+    # 뒤에서부터 꺼내므로 먼저 낼 한자를 끝에 둠 (같은 순위 안에서는 섞인 순서 유지)
+    remaining.sort(key=lambda r: priority(entries[r][0]), reverse=True)
+    weak_count = sum(1 for e in entries if is_weak(e[0]))
+    if weak_count:
+        print(f"{Fore.GREEN}틀린 적 있는 한자 {weak_count}자를 먼저 냅니다.{stylex}")
     # 틀린 한자: [인덱스, 다시 나오기까지 남은 문제 수]
     retry = []
     stats = Stats()
@@ -340,6 +394,17 @@ def review_by_grade():
     play(entries, f"{grade}급 한자를 모두 복습했습니다!")
 
 
+def review_weak():
+    entries = [e for e in hanzadata.load_all() if is_weak(e[0])]
+    if not entries:
+        print(f"{Fore.GREEN}복습할 오답이 없습니다!{stylex}\n")
+        return
+    print(f"{Fore.GREEN}{WEAK_STREAK}번 연속으로 맞히면 오답 목록에서 빠집니다.{stylex}")
+    play(entries, "오답을 모두 복습했습니다!")
+    left = sum(1 for e in entries if is_weak(e[0]))
+    print(f"{Fore.GREEN}남은 오답 : {left}자{stylex}\n")
+
+
 def main():
     if hanzadata.ensure_file():
         print(f"{Fore.GREEN}첫 설정을 하는 중입니다....{stylex}", end='', flush=True)
@@ -368,6 +433,7 @@ def main():
                 "게임 : 등록된 한자 전체 복습\n"
                 "급수학습 : 급수를 선택해 한자를 새로 등록하고 학습\n"
                 "급수복습 : 이미 등록된 한자를 급수별로 복습\n"
+                "오답복습 : 틀린 적 있는 한자만 복습\n"
                 "등록 : 학습한 한자 등록\n사전 : 학습한 한자 보기\n"
                 f"삭제 : 한자를 사전에서 삭제\n종료 : 프로그램을 종료합니다\n{stylex}"
             )
@@ -380,6 +446,9 @@ def main():
         elif A == '급수복습':
             print('')
             review_by_grade()
+        elif A == '오답복습':
+            print('')
+            review_weak()
         elif A == '등록':
             print('')
             Downloadimage.main()

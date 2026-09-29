@@ -1,6 +1,7 @@
 Resources/Hanza.txt
 Resources/Learned.txt
 Resources/HanzaInfo.json
+Resources/Record.json
 Resources/__pycache__/
 __pycache__/
 *.pyc

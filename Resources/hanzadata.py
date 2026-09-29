@@ -90,3 +90,35 @@ def delete_entry(hanja):
 
 def clear_all():
     save_all([])
+
+
+def learned_path():
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "Learned.txt")
+
+
+def _load_learned_all():
+    path = learned_path()
+    if not os.path.exists(path):
+        return {}
+    learned = {}
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f.read().split("\n"):
+            if FIELD_SEP not in line:
+                continue
+            grade_str, chars = line.split(FIELD_SEP, 1)
+            if grade_str.isdigit():
+                learned[int(grade_str)] = set(chars)
+    return learned
+
+
+def load_learned(grade):
+    """급수학습에서 묶음을 다 외운 한자 집합."""
+    return _load_learned_all().get(grade, set())
+
+
+def save_learned(grade, chars):
+    learned = _load_learned_all()
+    learned[grade] = set(chars)
+    with open(learned_path(), "w", encoding="utf-8") as f:
+        for g in sorted(learned):
+            f.write(f"{g}{FIELD_SEP}{''.join(sorted(learned[g]))}\n")

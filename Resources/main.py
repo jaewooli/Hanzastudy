@@ -280,24 +280,32 @@ def introduce(entries, chunk):
     return True
 
 
-def drill(entries, chunk, learned, stats):
-    """묶음 한자를 모두 연속 MASTERY_STREAK번 맞힐 때까지 출제. 다 외우면 None, 아니면 메뉴 명령."""
+def drill(entries, chunk, learned, stats, on_mastered):
+    """묶음 한자를 다 외울 때까지 출제. 다 외우면 None, 아니면 메뉴 명령.
+    처음부터 맞힌 한자는 한 번으로 끝, 한 번이라도 틀린 한자는 MASTERY_STREAK번 연속 맞혀야 끝.
+    외운 한자는 바로 on_mastered로 알려 중간에 그만둬도 다시 나오지 않게 한다."""
     streak = {r: 0 for r in chunk}
+    missed = set()
+    # 이전 묶음 한자는 틀린 적 있는 것만, 묶음마다 한 번씩만 섞어 냄
+    reviews = [r for r in learned if is_weak(entries[r][0])]
+    random.shuffle(reviews)
+
+    def target(r):
+        return MASTERY_STREAK if r in missed else 1
+
     last = None
     while 1:
-        pending = [r for r, s in streak.items() if s < MASTERY_STREAK]
+        pending = [r for r, s in streak.items() if s < target(r)]
         if not pending:
             return None
         candidates = [r for r in pending if r != last]
-        reviews = [r for r in learned if r != last and r not in streak]
         if reviews and (not candidates or random.random() < REVIEW_RATE):
-            r = random.choice(reviews)
+            r = reviews.pop()
         elif candidates:
             r = random.choice(candidates)
         else:
-            # 남은 한자가 방금 나온 한자뿐이면 이미 외운 한자를 사이에 끼움
-            others = [r for r in streak if r != last]
-            r = random.choice(others) if others else last
+            # 남은 한자가 방금 나온 한자뿐이면 이미 맞힌 한자를 끼우지 않고 바로 다시 냄
+            r = last
         last = r
         result = ask(entries, r, stats)
         if isinstance(result, str):
@@ -306,9 +314,25 @@ def drill(entries, chunk, learned, stats):
         if result:
             if r in streak:
                 streak[r] += 1
+                if streak[r] == target(r):
+                    on_mastered(r)
         else:
             # 이전 묶음 한자를 틀리면 이번 묶음에 넣어 다시 외움
             streak[r] = 0
+            missed.add(r)
+
+
+def fill_info(entries, rs):
+    """부수·예시 한자어가 저장되지 않은 한자의 정보를 미리 받아 둔다."""
+    global _info_cache
+    if _info_cache is None:
+        _info_cache = hanzadata.load_info()
+    missing = [entries[r][0] for r in rs if entries[r][0] not in _info_cache]
+    if not missing:
+        return
+    print(f"{Fore.GREEN}한자 {len(missing)}자의 부수·예시 한자어를 받아오는 중입니다...{stylex}")
+    for hanja in missing:
+        get_info(hanja)
 
 
 def learn(entries, grade):
@@ -325,24 +349,31 @@ def learn(entries, grade):
     if learned:
         print(f"{Fore.GREEN}지난번에 이어서 학습합니다. ({len(learned)}/{len(entries)}자 완료){stylex}")
     print(
-        f"{Fore.GREEN}{CHUNK_SIZE}자씩 먼저 보고, 모두 {MASTERY_STREAK}번 연속 맞히면 다음 묶음으로 넘어갑니다.\n"
+        f"{Fore.GREEN}{CHUNK_SIZE}자씩 먼저 보고, 모두 맞히면 다음 묶음으로 넘어갑니다.\n"
+        f"맞힌 한자는 다시 나오지 않고, 틀린 한자는 {MASTERY_STREAK}번 연속 맞혀야 합니다.\n"
         f"중간 결과 보기 : 결과 , 모르면 : 엔터 , 그만하기 : 종료{stylex}\n"
     )
+    fill_info(entries, learned)
     stats = Stats()
     command = None
+
+    def mastered(r):
+        if r not in learned:
+            learned.append(r)
+        learned_chars.add(entries[r][0])
+        hanzadata.save_learned(grade, learned_chars)
+
     while new:
         chunk, new = new[:CHUNK_SIZE], new[CHUNK_SIZE:]
+        fill_info(entries, chunk)
         chunk_no = len(learned) // CHUNK_SIZE + 1
         print(f"{Fore.GREEN}===== 묶음 {chunk_no}/{total_chunks} : 새 한자 보기 ====={stylex}\n")
         if not introduce(entries, chunk):
             break
         print(f"{Fore.GREEN}===== 묶음 {chunk_no}/{total_chunks} : 문제 ====={stylex}\n")
-        command = drill(entries, chunk, learned, stats)
+        command = drill(entries, chunk, learned, stats, mastered)
         if command is not None:
             break
-        learned += chunk
-        learned_chars.update(entries[r][0] for r in chunk)
-        hanzadata.save_learned(grade, learned_chars)
         print(f"{Fore.GREEN}묶음 {chunk_no} 완료! ({len(learned)}/{len(entries)}자){stylex}\n")
     else:
         print(f"{Fore.GREEN}{grade}급 한자를 모두 학습했습니다!{stylex}\n")

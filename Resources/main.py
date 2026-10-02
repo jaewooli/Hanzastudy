@@ -306,20 +306,16 @@ def introduce(entries, chunk):
 
 def drill(entries, chunk, learned, stats, on_mastered):
     """묶음 한자를 다 외울 때까지 출제. 다 외우면 None, 아니면 메뉴 명령.
-    처음부터 맞힌 한자는 한 번으로 끝, 한 번이라도 틀린 한자는 MASTERY_STREAK번 연속 맞혀야 끝.
+    모든 한자는 MASTERY_STREAK번 연속 맞혀야 끝.
     외운 한자는 바로 on_mastered로 알려 중간에 그만둬도 다시 나오지 않게 한다."""
     streak = {r: 0 for r in chunk}
-    missed = set()
     # 이전 묶음 한자는 틀린 적 있는 것만, 묶음마다 한 번씩만 섞어 냄
     reviews = [r for r in learned if is_weak(entries[r][0])]
     random.shuffle(reviews)
 
-    def target(r):
-        return MASTERY_STREAK if r in missed else 1
-
     last = None
     while 1:
-        pending = [r for r, s in streak.items() if s < target(r)]
+        pending = [r for r, s in streak.items() if s < MASTERY_STREAK]
         if not pending:
             return None
         candidates = [r for r in pending if r != last]
@@ -340,12 +336,11 @@ def drill(entries, chunk, learned, stats, on_mastered):
         if result:
             if r in streak:
                 streak[r] += 1
-                if streak[r] == target(r):
+                if streak[r] == MASTERY_STREAK:
                     on_mastered(r)
         else:
             # 이전 묶음 한자를 틀리면 이번 묶음에 넣어 다시 외움
             streak[r] = 0
-            missed.add(r)
 
 
 def fill_info(entries, rs):
@@ -398,7 +393,7 @@ def learn(entries, grade):
     print(
         f"\n{Fore.GREEN}{CHUNK_SIZE}자씩 먼저 보고, 모두 맞히면 다음 묶음으로 넘어갑니다.\n"
         f"고른 묶음은 처음부터 다시 하고, 이후 묶음은 아직 못 외운 한자만 나옵니다.\n"
-        f"맞힌 한자는 다시 나오지 않고, 틀린 한자는 {MASTERY_STREAK}번 연속 맞혀야 합니다.\n"
+        f"한자마다 {MASTERY_STREAK}번 연속 맞혀야 하고, 틀리면 처음부터 다시 셉니다.\n"
         f"{HELP_LINE}{stylex}\n"
     )
     # 이전 묶음에서 외운 한자 (틀린 적 있는 것만 복습으로 섞어 냄)

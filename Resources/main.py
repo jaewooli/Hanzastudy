@@ -196,7 +196,9 @@ def _ask(entries, r, stats):
         print('')
         return None
     if A in means:
-        print(f"{Fore.GREEN}정답입니다!\n{stylex}")
+        print(f"{Fore.GREEN}정답입니다!{stylex}")
+        show_hanja(hanja, means)
+        print('')
         return True
     if A in DONT_KNOW:
         show_hanja(hanja, means)
@@ -209,7 +211,9 @@ def _ask(entries, r, stats):
         if A in QUIT:
             return "종료"
         if A in ("Y", "y", "ㅛ"):
-            print('\n')
+            print('')
+            show_hanja(hanja, means)
+            print('')
             return True
         elif A in ("N", "n", "ㅜ"):
             print('')

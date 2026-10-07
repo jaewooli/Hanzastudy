@@ -209,11 +209,15 @@ def _get_from_grade_list_page(grade):
 
 
 def _get_from_grade_document(grade):
-    """1~4급: 급수별 문서가 분리되어 있어 '전국한자능력검정시험/배정한자/N급' 문서에서 가져온다."""
-    title = f"전국한자능력검정시험/배정한자/{grade}급"
-    url = "https://namu.wiki/w/" + urllib.parse.quote(title)
-    soup = _fetch_soup(url)
-    return _chars_from_tables(soup.find_all("table"))
+    """1~4급: 급수별 문서가 분리되어 있어 '전국한자능력검정시험/배정한자/N급' 문서에서 가져온다.
+    N급 문서에는 N급에서 새로 추가되는 한자만 있으므로, 준N급(N급Ⅱ) 문서가 있으면 함께 가져온다."""
+    chars = []
+    for label in (f"준{grade}급", f"{grade}급"):
+        title = f"전국한자능력검정시험/배정한자/{label}"
+        url = "https://namu.wiki/w/" + urllib.parse.quote(title)
+        soup = _fetch_soup(url)
+        chars.extend(c for c in _chars_from_tables(soup.find_all("table")) if c not in chars)
+    return chars
 
 
 def get_hanza_list_by_grade(grade):

@@ -26,9 +26,11 @@ VALID_GRADES = list(range(1, 9))
 MENU = ["게임", "급수학습", "급수복습", "오답복습", "등록", "사전", "삭제", "종료"]
 
 
-# 그만하기·다음 명령 (안내문에 나온 단어를 그대로 입력해도 동작하도록)
+# 문제를 풀 때는 한자의 뜻(예: '마칠 종료', '다음 차')과 겹치지 않도록 명령 앞에 '/'를 붙여 입력
+COMMAND_PREFIX = ("/", "／")
 QUIT = ("종료", "그만", "그만하기", "break")
 SKIP = ("다음", "넘기기", "next")
+RESULT = ("결과", "result")
 
 
 def read(prompt=""):
@@ -36,10 +38,22 @@ def read(prompt=""):
     return unicodedata.normalize("NFC", input(prompt)).strip()
 
 
+def command_of(s):
+    """'/종료' -> '종료'. 명령이 아니면 None."""
+    if s.startswith(COMMAND_PREFIX):
+        return s[1:].strip()
+    return None
+
+
+def is_quit(s):
+    """뜻을 입력받는 곳이 아니므로 '/' 없이 입력해도 그만하기로 인정"""
+    return s in QUIT or command_of(s) in QUIT
+
+
 def ask_grade():
     while True:
-        s = read(f"{Fore.GREEN}급수를 입력하세요 (1~8, 취소: 종료){stylex}\n")
-        if s in QUIT or s == "취소":
+        s = read(f"{Fore.GREEN}급수를 입력하세요 (1~8, 취소: /종료){stylex}\n")
+        if is_quit(s) or s == "취소":
             return None
         if s.isdigit() and int(s) in VALID_GRADES:
             return int(s)
@@ -54,7 +68,7 @@ REVIEW_RATE = 0.2
 
 DONT_KNOW = ("", "?", "모름")
 
-HELP_LINE = "중간 결과 보기 : '결과' 입력 , 모르면 : 엔터 , 건너뛰기 : '다음' 입력 , 그만하기 : '종료' 입력"
+HELP_LINE = "모르면 : 엔터 , 중간 결과 : /결과 , 건너뛰기 : /다음 , 그만하기 : /종료 (명령은 '/'를 붙여 입력)"
 
 # 예시 한자어 뜻이 길면 이 글자 수에서 자름
 WORD_MEAN_LIMIT = 40
@@ -75,6 +89,37 @@ class Stats:
             self.correct += 1
         else:
             self.fails[r] = self.fails.get(r, 0) + 1
+
+
+PROGRESS_WIDTH = 20
+
+
+def progress_bar(done, retry, total):
+    """초록: 끝난 한자, 빨강: 다시 낼 오답, 회색: 아직 안 나온 한자"""
+    green = done * PROGRESS_WIDTH // total
+    red = (done + retry) * PROGRESS_WIDTH // total - green
+    if retry and not red:
+        red = 1
+        green = min(green, PROGRESS_WIDTH - 1)
+    gray = PROGRESS_WIDTH - green - red
+    return (
+        f"{Fore.GREEN}{'█' * green}{Fore.RED}{'█' * red}{Style.DIM}{'░' * gray}{stylex}"
+        f" {Fore.GREEN}{done * 100 // total}%{stylex} ({done}/{total}자)"
+        + (f"  {Fore.RED}다시 낼 오답 {retry}{stylex}" if retry else "")
+    )
+
+
+def mastery_dots(streaks):
+    """묶음 한자마다 ●: 외움, ◐: 연속으로 맞히는 중, ○: 아직"""
+    dots = []
+    for s in sorted(streaks, reverse=True):
+        if s >= MASTERY_STREAK:
+            dots.append(f"{Fore.GREEN}●")
+        elif s:
+            dots.append(f"{Fore.YELLOW}◐")
+        else:
+            dots.append(f"{Style.DIM}○{Style.NORMAL}")
+    return "".join(dots) + stylex
 
 
 def print_result(title, entries, stats):
@@ -169,32 +214,39 @@ def priority(hanja):
     return 3
 
 
-def ask(entries, r, stats):
+def ask(entries, r, stats, progress=""):
     """한 문제를 낸다. 맞으면 True, 틀리면 False, 넘기면 None, 메뉴 명령이면 '등록'/'사전'/'종료'."""
-    result = _ask(entries, r, stats)
+    result = _ask(entries, r, stats, progress)
     if isinstance(result, bool):
         record_answer(entries[r][0], result)
     return result
 
 
-def _ask(entries, r, stats):
+def _ask(entries, r, stats, progress):
     hanja, means, _ = entries[r]
+    if progress:
+        print(progress)
     print(hanjaart.best(hanja))
-    A = read()
-    while A in ("결과", "result"):
-        print('')
-        print_result("중간 결과", entries, stats)
-        print(hanjaart.best(hanja))
+    while 1:
         A = read()
-    if A in ("등록", "save", "한자"):
-        return "등록"
-    if A == "사전":
-        return "사전"
-    if A in QUIT:
-        return "종료"
-    if A in SKIP:
-        print('')
-        return None
+        command = command_of(A)
+        if command is None:
+            break
+        if command in RESULT:
+            print('')
+            print_result("중간 결과", entries, stats)
+            print(hanjaart.best(hanja))
+        elif command in ("등록", "save", "한자"):
+            return "등록"
+        elif command == "사전":
+            return "사전"
+        elif command in QUIT:
+            return "종료"
+        elif command in SKIP:
+            print('')
+            return None
+        else:
+            print(f"{Fore.RED}알 수 없는 명령입니다. {HELP_LINE}{stylex}")
     if A in means:
         print(f"{Fore.GREEN}정답입니다!{stylex}")
         show_hanja(hanja, means)
@@ -208,7 +260,7 @@ def _ask(entries, r, stats):
     print(", ".join(means))
     while 1:
         A = read()
-        if A in QUIT:
+        if is_quit(A):
             return "종료"
         if A in ("Y", "y", "ㅛ"):
             print('')
@@ -273,7 +325,10 @@ def play(entries, empty_message):
         for pending in retry:
             pending[1] -= 1
         last = r
-        result = ask(entries, r, stats)
+        # 지금 문제와 다시 낼 오답을 뺀 나머지는 끝난 한자
+        done = len(entries) - len(remaining) - len(retry) - 1
+        progress = "진행 " + progress_bar(done, len(retry), len(entries))
+        result = ask(entries, r, stats, progress)
         if isinstance(result, str):
             command = result
             break
@@ -301,14 +356,14 @@ def introduce(entries, chunk):
         hanja, means, _ = entries[r]
         print(hanjaart.best(hanja))
         show_hanja(hanja, means)
-        A = read(f"({i}/{len(chunk)}) 다음 한자 : 엔터 , 그만하기 : '종료' 입력\n")
-        if A in QUIT:
+        A = read(f"({i}/{len(chunk)}) 다음 한자 : 엔터 , 그만하기 : /종료\n")
+        if is_quit(A):
             return False
         print('')
     return True
 
 
-def drill(entries, chunk, learned, stats, on_mastered):
+def drill(entries, chunk, learned, stats, on_mastered, title=""):
     """묶음 한자를 다 외울 때까지 출제. 다 외우면 None, 아니면 메뉴 명령.
     모든 한자는 MASTERY_STREAK번 연속 맞혀야 끝.
     외운 한자는 바로 on_mastered로 알려 중간에 그만둬도 다시 나오지 않게 한다."""
@@ -331,7 +386,9 @@ def drill(entries, chunk, learned, stats, on_mastered):
             # 남은 한자가 방금 나온 한자뿐이면 이미 맞힌 한자를 끼우지 않고 바로 다시 냄
             r = last
         last = r
-        result = ask(entries, r, stats)
+        done = sum(1 for s in streak.values() if s >= MASTERY_STREAK)
+        progress = f"{title}  {mastery_dots(streak.values())}  외운 한자 {done}/{len(streak)}자"
+        result = ask(entries, r, stats, progress)
         if isinstance(result, str):
             return result
         if result is None:
@@ -377,9 +434,9 @@ def choose_chunk(entries, chunks, learned_chars):
     while 1:
         A = read(
             f"{Fore.GREEN}시작할 묶음 번호를 입력하세요 "
-            f"(엔터 : {default + 1}번부터 , 그만하기 : '종료' 입력){stylex}\n"
+            f"(엔터 : {default + 1}번부터 , 그만하기 : /종료){stylex}\n"
         )
-        if A in QUIT:
+        if is_quit(A):
             return None
         if A == "":
             return default
@@ -422,7 +479,7 @@ def learn(entries, grade):
         if not introduce(entries, chunk):
             break
         print(f"{Fore.GREEN}===== {title} : 문제 ====={stylex}\n")
-        command = drill(entries, chunk, learned, stats, mastered)
+        command = drill(entries, chunk, learned, stats, mastered, title)
         if command is not None:
             break
         print(f"{Fore.GREEN}{title} 완료! ({len(learned_chars)}/{len(entries)}자){stylex}\n")

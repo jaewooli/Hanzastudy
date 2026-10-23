@@ -146,13 +146,17 @@ def save_info(info):
         json.dump(info, f, ensure_ascii=False, indent=1)
 
 
-def record_path():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "Record.json")
+RECORD_FILES = {"hanja": "Record.json", "word": "WordRecord.json", "choice": "ChoiceRecord.json"}
 
 
-def load_records():
-    """한자별 풀이 기록: {한자: {"right": 맞힌 수, "wrong": 틀린 수, "streak": 연속 정답, "last": 마지막 풀이 시각}}"""
-    path = record_path()
+def record_path(kind="hanja"):
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), RECORD_FILES[kind])
+
+
+def load_records(kind="hanja"):
+    """문제별 풀이 기록: {한자(한자어): {"right": 맞힌 수, "wrong": 틀린 수, "streak": 연속 정답, "last": 마지막 풀이 시각}}
+    kind - hanja: 한자 보고 뜻 쓰기, word: 한자어 독음, choice: 훈음 보고 한자 고르기"""
+    path = record_path(kind)
     if not os.path.exists(path):
         return {}
     try:
@@ -162,6 +166,6 @@ def load_records():
         return {}
 
 
-def save_records(records):
-    with open(record_path(), "w", encoding="utf-8") as f:
+def save_records(records, kind="hanja"):
+    with open(record_path(kind), "w", encoding="utf-8") as f:
         json.dump(records, f, ensure_ascii=False, indent=1)

@@ -23,7 +23,7 @@ stylex = Style.RESET_ALL
 
 VALID_GRADES = list(range(1, 9))
 
-MENU = ["게임", "급수학습", "급수복습", "오답복습", "등록", "사전", "삭제", "종료"]
+MENU = ["게임", "급수학습", "급수복습", "오답복습", "한자어", "골라맞히기", "등록", "사전", "삭제", "종료"]
 
 
 # 문제를 풀 때는 한자의 뜻(예: '마칠 종료', '다음 차')과 겹치지 않도록 명령 앞에 '/'를 붙여 입력
@@ -50,11 +50,15 @@ def is_quit(s):
     return s in QUIT or command_of(s) in QUIT
 
 
-def ask_grade():
+def ask_grade(allow_all=False):
+    """급수(1~8)를 고른다. 취소하면 None, allow_all이면 엔터로 전체(0)."""
     while True:
-        s = read(f"{Fore.GREEN}급수를 입력하세요 (1~8, 취소: /종료){stylex}\n")
+        hint = "1~8, 전체: 엔터, 취소: /종료" if allow_all else "1~8, 취소: /종료"
+        s = read(f"{Fore.GREEN}급수를 입력하세요 ({hint}){stylex}\n")
         if is_quit(s) or s == "취소":
             return None
+        if allow_all and s == "":
+            return 0
         if s.isdigit() and int(s) in VALID_GRADES:
             return int(s)
         print(f"{Fore.RED}1~8 사이의 숫자를 입력해주세요.{stylex}\n")
@@ -76,6 +80,12 @@ WORD_MEAN_LIMIT = 40
 # 틀린 적 있는 한자는 이만큼 연속으로 맞혀야 오답복습에서 빠짐
 WEAK_STREAK = 3
 
+# 문제 종류별 (문제 이름, 세는 단위)
+# hanja: 한자 보고 뜻 쓰기, word: 한자어 보고 독음 쓰기, choice: 훈음 보고 한자 고르기
+KIND_NAMES = {"hanja": ("한자", "자"), "word": ("한자어", "개"), "choice": ("한자", "자")}
+
+CHOICE_COUNT = 4
+
 
 class Stats:
     def __init__(self):
@@ -94,7 +104,7 @@ class Stats:
 PROGRESS_WIDTH = 20
 
 
-def progress_bar(done, retry, total):
+def progress_bar(done, retry, total, unit="자"):
     """초록: 끝난 한자, 빨강: 다시 낼 오답, 회색: 아직 안 나온 한자"""
     green = done * PROGRESS_WIDTH // total
     red = (done + retry) * PROGRESS_WIDTH // total - green
@@ -104,7 +114,7 @@ def progress_bar(done, retry, total):
     gray = PROGRESS_WIDTH - green - red
     return (
         f"{Fore.GREEN}{'█' * green}{Fore.RED}{'█' * red}{Style.DIM}{'░' * gray}{stylex}"
-        f" {Fore.GREEN}{done * 100 // total}%{stylex} ({done}/{total}자)"
+        f" {Fore.GREEN}{done * 100 // total}%{stylex} ({done}/{total}{unit})"
         + (f"  {Fore.RED}다시 낼 오답 {retry}{stylex}" if retry else "")
     )
 
@@ -122,19 +132,20 @@ def mastery_dots(streaks):
     return "".join(dots) + stylex
 
 
-def print_result(title, entries, stats):
+def print_result(title, entries, stats, kind="hanja"):
     asked, correct, fails = stats.asked, stats.correct, stats.fails
+    name = KIND_NAMES[kind][0]
     print(f"{Fore.GREEN}===== {title} ====={stylex}")
     print(f"푼 문제 : {asked}  /  정답 : {Fore.GREEN}{correct}{stylex}  /  오답 : {Fore.RED}{asked - correct}{stylex}")
     if asked:
         print(f"정답률 : {correct * 100 // asked}%")
     if fails:
-        print(f"{Fore.RED}틀린 한자{stylex}")
+        print(f"{Fore.RED}틀린 {name}{stylex}")
         for r, count in sorted(fails.items(), key=lambda x: -x[1]):
             hanja, means, _ = entries[r]
             print(f"  {hanja} ({', '.join(means)}) : {Fore.RED}{count}번{stylex}")
     else:
-        print(f"{Fore.GREEN}틀린 한자가 없습니다!{stylex}")
+        print(f"{Fore.GREEN}틀린 {name}가 없습니다!{stylex}")
     print('')
 
 
@@ -175,18 +186,17 @@ def show_hanja(hanja, means):
         print(f"  {Fore.CYAN}{word}({reading}){stylex} {mean}")
 
 
-_records = None
+_records = {}
 
 
-def records():
-    global _records
-    if _records is None:
-        _records = hanzadata.load_records()
-    return _records
+def records(kind="hanja"):
+    if kind not in _records:
+        _records[kind] = hanzadata.load_records(kind)
+    return _records[kind]
 
 
-def record_answer(hanja, ok):
-    rec = records().setdefault(hanja, {"right": 0, "wrong": 0, "streak": 0})
+def record_answer(hanja, ok, kind="hanja"):
+    rec = records(kind).setdefault(hanja, {"right": 0, "wrong": 0, "streak": 0})
     if ok:
         rec["right"] += 1
         rec["streak"] += 1
@@ -194,59 +204,75 @@ def record_answer(hanja, ok):
         rec["wrong"] += 1
         rec["streak"] = 0
     rec["last"] = int(time.time())
-    hanzadata.save_records(records())
+    hanzadata.save_records(records(kind), kind)
 
 
-def is_weak(hanja):
-    rec = records().get(hanja)
+def is_weak(hanja, kind="hanja"):
+    rec = records(kind).get(hanja)
     return bool(rec) and rec["wrong"] > 0 and rec["streak"] < WEAK_STREAK
 
 
-def priority(hanja):
+def priority(hanja, kind="hanja"):
     """낮을수록 먼저 출제: 최근에 틀림 < 틀린 적 있음 < 처음 봄 < 잘 앎"""
-    rec = records().get(hanja)
+    rec = records(kind).get(hanja)
     if rec is None:
         return 2
     if rec["streak"] == 0:
         return 0
-    if is_weak(hanja):
+    if is_weak(hanja, kind):
         return 1
     return 3
 
 
-def ask(entries, r, stats, progress=""):
-    """한 문제를 낸다. 맞으면 True, 틀리면 False, 넘기면 None, 메뉴 명령이면 '등록'/'사전'/'종료'."""
-    result = _ask(entries, r, stats, progress)
-    if isinstance(result, bool):
-        record_answer(entries[r][0], result)
-    return result
+class Interrupt(Exception):
+    """문제 도중 명령으로 문제를 끝냄. result는 ask가 돌려줄 값."""
+
+    def __init__(self, result):
+        super().__init__(result)
+        self.result = result
 
 
-def _ask(entries, r, stats, progress):
-    hanja, means, _ = entries[r]
-    if progress:
-        print(progress)
-    print(hanjaart.best(hanja))
+def read_answer(entries, stats, kind, redraw):
+    """명령을 처리하며 답을 읽는다. 문제를 끝내는 명령이면 Interrupt."""
     while 1:
         A = read()
         command = command_of(A)
         if command is None:
-            break
+            return A
         if command in RESULT:
             print('')
-            print_result("중간 결과", entries, stats)
-            print(hanjaart.best(hanja))
+            print_result("중간 결과", entries, stats, kind)
+            redraw()
         elif command in ("등록", "save", "한자"):
-            return "등록"
+            raise Interrupt("등록")
         elif command == "사전":
-            return "사전"
+            raise Interrupt("사전")
         elif command in QUIT:
-            return "종료"
+            raise Interrupt("종료")
         elif command in SKIP:
             print('')
-            return None
+            raise Interrupt(None)
         else:
             print(f"{Fore.RED}알 수 없는 명령입니다. {HELP_LINE}{stylex}")
+
+
+def ask(entries, r, stats, progress="", kind="hanja"):
+    """한 문제를 낸다. 맞으면 True, 틀리면 False, 넘기면 None, 메뉴 명령이면 '등록'/'사전'/'종료'."""
+    if progress:
+        print(progress)
+    try:
+        result = ASKERS[kind](entries, r, stats)
+    except Interrupt as e:
+        result = e.result
+    if isinstance(result, bool):
+        record_answer(entries[r][0], result, kind)
+    return result
+
+
+def _ask(entries, r, stats):
+    hanja, means, _ = entries[r]
+    print(hanjaart.best(hanja))
+    A = read_answer(entries, stats, "hanja", lambda: print(hanjaart.best(hanja)))
     if A in means:
         print(f"{Fore.GREEN}정답입니다!{stylex}")
         show_hanja(hanja, means)
@@ -276,6 +302,132 @@ def _ask(entries, r, stats, progress):
             print(f"{Fore.RED}Y 혹은 N을 입력해주세요{stylex}")
 
 
+def char_means():
+    """사전의 {한자: 훈음 목록}"""
+    return {hanja: means for hanja, means, _ in hanzadata.load_all()}
+
+
+def word_entries(grade):
+    """사전에 등록된 글자로만 된 예시 한자어: [(한자어, [독음], 뜻)].
+    grade가 0이 아니면 그 급수 한자가 들어간 것만."""
+    all_entries = hanzadata.load_all()
+    # 예시 한자어는 고른 급수 한자의 것만 받아 둠 (전체면 모두)
+    fill_info(all_entries, [r for r, e in enumerate(all_entries) if not grade or e[2] == grade])
+    registered = {e[0] for e in all_entries}
+    grade_chars = {e[0] for e in all_entries if e[2] == grade}
+    words = {}
+    for hanja in registered:
+        info = _info_cache.get(hanja)
+        if not info:
+            continue
+        for word, reading, mean in info["words"]:
+            if len(word) < 2 or word in words or not set(word) <= registered:
+                continue
+            if grade and not set(word) & grade_chars:
+                continue
+            words[word] = (word, [reading], re.sub(r"^\d+\.\s*", "", mean))
+    return list(words.values())
+
+
+def show_word(word, reading, mean, means_of):
+    print(f"{Fore.YELLOW}{word}({reading}){stylex} {mean}")
+    for c in word:
+        print(f"  {c} : {display_means(means_of.get(c, []))}")
+
+
+_char_means = None
+
+
+def _ask_word(entries, r, stats):
+    """한자어를 보여주고 독음을 입력받는다. 띄어쓰기는 무시."""
+    global _char_means
+    if _char_means is None:
+        _char_means = char_means()
+    word, readings, mean = entries[r]
+
+    def draw():
+        print(hanjaart.best_row(word))
+
+    draw()
+    A = read_answer(entries, stats, "word", draw)
+    ok = A.replace(" ", "") in [x.replace(" ", "") for x in readings]
+    if ok:
+        print(f"{Fore.GREEN}정답입니다!{stylex}")
+    elif A not in DONT_KNOW:
+        print(f"{Fore.RED}오답입니다{stylex}")
+    show_word(word, readings[0], mean, _char_means)
+    print('')
+    return ok
+
+
+def sounds(means):
+    """'학교 교', '풍길 효' -> {'교', '효'}"""
+    return {m.split()[-1] for m in means if " " in m}
+
+
+def radical_of(hanja):
+    info = (_info_cache or {}).get(hanja)
+    return info["radical"].split("(")[0] if info and info["radical"] else None
+
+
+def choices_for(entries, r, pool):
+    """정답과 헷갈리기 쉬운 보기: 같은 부수·같은 음 한자를 먼저, 모자라면 아무 한자나."""
+    hanja, means, _ = entries[r]
+    shown = set(display_means(means).split(", "))
+    radical, sound = radical_of(hanja), sounds(means)
+    similar, others = [], []
+    for c, c_means, _ in pool:
+        # 훈음이 겹치면 정답이 둘이 되므로 뺌
+        if c == hanja or shown & set(c_means):
+            continue
+        if (radical and radical_of(c) == radical) or sound & sounds(c_means):
+            similar.append(c)
+        else:
+            others.append(c)
+    random.shuffle(similar)
+    random.shuffle(others)
+    picked = (similar + others)[:CHOICE_COUNT - 1] + [hanja]
+    random.shuffle(picked)
+    return picked
+
+
+_choice_pool = None
+
+
+def _ask_choice(entries, r, stats):
+    """훈음을 보여주고 한자를 고르게 한다. 번호나 한자로 답한다."""
+    global _choice_pool
+    if _choice_pool is None:
+        _choice_pool = hanzadata.load_all()
+    hanja, means, _ = entries[r]
+    choices = choices_for(entries, r, _choice_pool)
+
+    def draw():
+        print(f"{Fore.YELLOW}{display_means(means)}{stylex}")
+        print(hanjaart.best_row(choices, [str(i) for i in range(1, len(choices) + 1)]))
+
+    draw()
+    while 1:
+        A = read_answer(entries, stats, "choice", draw)
+        if A.isdigit() and 1 <= int(A) <= len(choices):
+            A = choices[int(A) - 1]
+        if A in choices or A in DONT_KNOW:
+            break
+        print(f"{Fore.RED}1~{len(choices)} 사이의 번호를 입력해주세요.{stylex}")
+    ok = A == hanja
+    if ok:
+        print(f"{Fore.GREEN}정답입니다!{stylex}")
+    elif A not in DONT_KNOW:
+        picked = next(e for e in _choice_pool if e[0] == A)
+        print(f"{Fore.RED}오답입니다{stylex}  고른 한자 {A} : {display_means(picked[1])}")
+    show_hanja(hanja, means)
+    print('')
+    return ok
+
+
+ASKERS = {"hanja": _ask, "word": _ask_word, "choice": _ask_choice}
+
+
 def run_command(command):
     if command == "등록":
         Downloadimage.main()
@@ -283,14 +435,15 @@ def run_command(command):
         printhanza.main()
 
 
-def play(entries, empty_message):
+def play(entries, empty_message, kind="hanja"):
+    name, unit = KIND_NAMES[kind]
     remaining = list(range(len(entries)))
     random.shuffle(remaining)
     # 뒤에서부터 꺼내므로 먼저 낼 한자를 끝에 둠 (같은 순위 안에서는 섞인 순서 유지)
-    remaining.sort(key=lambda r: priority(entries[r][0]), reverse=True)
-    weak_count = sum(1 for e in entries if is_weak(e[0]))
+    remaining.sort(key=lambda r: priority(entries[r][0], kind), reverse=True)
+    weak_count = sum(1 for e in entries if is_weak(e[0], kind))
     if weak_count:
-        print(f"{Fore.GREEN}틀린 적 있는 한자 {weak_count}자를 먼저 냅니다.{stylex}")
+        print(f"{Fore.GREEN}틀린 적 있는 {name} {weak_count}{unit}를 먼저 냅니다.{stylex}")
     # 틀린 한자: [인덱스, 다시 나오기까지 남은 문제 수]
     retry = []
     stats = Stats()
@@ -327,8 +480,8 @@ def play(entries, empty_message):
         last = r
         # 지금 문제와 다시 낼 오답을 뺀 나머지는 끝난 한자
         done = len(entries) - len(remaining) - len(retry) - 1
-        progress = "진행 " + progress_bar(done, len(retry), len(entries))
-        result = ask(entries, r, stats, progress)
+        progress = "진행 " + progress_bar(done, len(retry), len(entries), unit)
+        result = ask(entries, r, stats, progress, kind)
         if isinstance(result, str):
             command = result
             break
@@ -346,7 +499,7 @@ def play(entries, empty_message):
             retry.append([r, gap])
 
     if stats.asked:
-        print_result("최종 결과", entries, stats)
+        print_result("최종 결과", entries, stats, kind)
     run_command(command)
 
 
@@ -547,6 +700,33 @@ def review_weak():
     print(f"{Fore.GREEN}남은 오답 : {left}자{stylex}\n")
 
 
+def word_quiz():
+    grade = ask_grade(allow_all=True)
+    if grade is None:
+        return
+    entries = word_entries(grade)
+    if not entries:
+        print(f"{Fore.RED}낼 수 있는 한자어가 없습니다. 먼저 한자를 더 등록해주세요.{stylex}\n")
+        return
+    print(f"{Fore.GREEN}한자어 {len(entries)}개 : 한자어를 보고 읽는 법(독음)을 한글로 입력하세요.{stylex}")
+    play(entries, "한자어를 모두 풀었습니다!", "word")
+
+
+def choice_quiz():
+    grade = ask_grade(allow_all=True)
+    if grade is None:
+        return
+    all_entries = hanzadata.load_all()
+    entries = [e for e in all_entries if not grade or e[2] == grade]
+    if len(all_entries) < CHOICE_COUNT or not entries:
+        print(f"{Fore.RED}낼 수 있는 한자가 부족합니다. 먼저 한자를 더 등록해주세요.{stylex}\n")
+        return
+    # 오답 보기를 같은 부수로 고르려면 부수 정보가 필요 (다른 급수 한자는 받아 둔 것만 씀)
+    fill_info(entries, range(len(entries)))
+    print(f"{Fore.GREEN}훈음을 보고 알맞은 한자의 번호를 입력하세요.{stylex}")
+    play(entries, "모든 한자를 풀었습니다!", "choice")
+
+
 def main():
     if hanzadata.ensure_file():
         print(f"{Fore.GREEN}첫 설정을 하는 중입니다....{stylex}", end='', flush=True)
@@ -576,6 +756,8 @@ def main():
                 "급수학습 : 급수를 선택해 한자를 새로 등록하고 학습\n"
                 "급수복습 : 이미 등록된 한자를 급수별로 복습\n"
                 "오답복습 : 틀린 적 있는 한자만 복습\n"
+                "한자어 : 한자어를 보고 독음 쓰기\n"
+                "골라맞히기 : 훈음을 보고 한자 고르기\n"
                 "등록 : 학습한 한자 등록\n사전 : 학습한 한자 보기\n"
                 f"삭제 : 한자를 사전에서 삭제\n종료 : 프로그램을 종료합니다\n{stylex}"
             )
@@ -591,6 +773,12 @@ def main():
         elif A == '오답복습':
             print('')
             review_weak()
+        elif A == '한자어':
+            print('')
+            word_quiz()
+        elif A == '골라맞히기':
+            print('')
+            choice_quiz()
         elif A == '등록':
             print('')
             Downloadimage.main()

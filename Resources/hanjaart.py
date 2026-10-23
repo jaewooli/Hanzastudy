@@ -184,3 +184,78 @@ def best(hanja):
         if art is not None:
             return art
     return render(hanja) or hanja
+
+
+# ---- 여러 글자를 한 줄로: 한자어, 골라맞히기 보기 ----
+# 글자 사이 간격과 보기 번호 자리 (글자 칸 크기에 대한 비율)
+_ROW_GAP = 0.25
+_ROW_LABEL = 0.45
+_BLOCK_ROW_GAP = 2
+
+
+def _glyph(hanja, size):
+    """size x size 칸에 그린 한 글자. 어느 폰트로도 못 그리면 None."""
+    for font in _load_fonts(int(size * 0.88)):
+        image = _rasterize(hanja, font, size, size)
+        if image is not None:
+            return image
+    return None
+
+
+def _label_font(size):
+    """번들 폰트에는 숫자가 없어 보기 번호는 Pillow 기본 폰트로 그린다."""
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
+def _render_row(chars, labels, size):
+    """글자들을 가로로 이어 붙인 이미지. 한 글자라도 못 그리면 None."""
+    glyphs = [_glyph(c, size) for c in chars]
+    if any(g is None for g in glyphs):
+        return None
+    gap = int(size * _ROW_GAP)
+    label_w = int(size * _ROW_LABEL) if labels else 0
+    cell = label_w + size
+    image = Image.new("L", (cell * len(chars) + gap * (len(chars) - 1), size), color=0)
+    draw = ImageDraw.Draw(image)
+    font = _label_font(int(size * 0.45)) if labels else None
+    for i, glyph in enumerate(glyphs):
+        x = i * (cell + gap)
+        if labels:
+            draw.text((x, 0), labels[i], fill=255, font=font)
+        image.paste(glyph, (x + label_w, 0))
+    return image
+
+
+def render_row(chars, labels=None):
+    """한 글자씩 그린 반블록 아트를 가로로 이어 붙인다. labels가 있으면 각 글자 왼쪽 위에 붙인다."""
+    arts = [render(c) for c in chars]
+    if not arts or any(a is None for a in arts):
+        return None
+    blocks = [a.split("\n") for a in arts]
+    height = max(len(b) for b in blocks)
+    pad = max(len(label) for label in labels) + 1 if labels else 0
+    lines = []
+    for n in range(height):
+        parts = []
+        for i, block in enumerate(blocks):
+            head = (labels[i] if n == 0 else "").ljust(pad) if labels else ""
+            parts.append(head + (block[n] if n < len(block) else "").ljust(_BLOCK_WIDTH))
+        lines.append((" " * _BLOCK_ROW_GAP).join(parts).rstrip())
+    return "\n".join(lines)
+
+
+def best_row(chars, labels=None):
+    """여러 글자(한자어, 보기)를 한 줄로 크게. 그릴 수 없으면 원문 글자를 늘어놓는다."""
+    if not os.environ.get("HANZA_NO_SIXEL") and Image is not None and chars:
+        image = _render_row(chars, labels, _SIXEL_SIZE)
+        if image is not None:
+            return _encode_sixel(image)
+    art = render_row(chars, labels)
+    if art is not None:
+        return art
+    if labels:
+        return "    ".join(f"{label} {c}" for label, c in zip(labels, chars))
+    return "  ".join(chars)
